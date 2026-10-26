@@ -29,6 +29,11 @@
 
 **Ningún patrón usa `Scan`.** Los filtros de `colegio/estudiantes` (alto o bajo score) se aplican sobre el resultado del patrón 7: son los estudiantes de un solo colegio.
 
+## Consumidores internos
+
+- El servicio `habilidades` consulta `GET /perfiles/me` reenviando el access token del request original. Usa el `colegioId` del perfil del estudiante al declarar y el del perfil del usuario colegio al listar o revisar pendientes.
+- `habilidades` no lee directamente `USER#<sub> / PROFILE` con `GetItem`; de ese modo, el servicio `perfiles` conserva la propiedad de sus claves y reglas.
+
 ## Reglas del dominio
 
 - `readinessScore` y `profileViews` **no se editan por el usuario**: el patrón 3 los ignora.

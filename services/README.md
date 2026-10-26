@@ -59,7 +59,20 @@ serverless logs -f health --stage <stage>
 
 El stage `demo` solo se despliega desde `main`, en los releases (Rol 1).
 
-## 3. Convenciones
+## 3. Usuarios y tokens de prueba
+
+Los scripts de B1-17 leen los IDs desde los outputs del stack y no guardan contraseñas en Git:
+
+```bash
+export CEIBBO_TEST_PASSWORD='una-clave-temporal-segura'
+bash scripts/aws/crear-usuarios-prueba.sh rol2
+TOKEN=$(bash scripts/aws/token.sh rol2 estudiante@ceibbo.cl)
+curl -i -H "Authorization: Bearer $TOKEN" <HttpApiUrl>/health/privado
+```
+
+El primer script crea o actualiza `estudiante@ceibbo.cl`, `empresa@ceibbo.cl` y `colegio@ceibbo.cl`, los agrega a sus grupos y deja sus perfiles de prueba en DynamoDB. El estudiante y el usuario colegio quedan asociados a `school-1`, lo que permite probar la autorización del servicio habilidades. `ALLOW_USER_PASSWORD_AUTH` se usa solo en stages de desarrollo.
+
+## 4. Convenciones
 
 **Carpetas de cada servicio:**
 

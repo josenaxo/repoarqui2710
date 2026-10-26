@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { SkillPill } from '@/components/ui/SkillPill'
 import { Button } from '@/components/ui/Button'
-import { api } from '@/lib/api-client'
+import { aStudentProfile, obtenerPerfil } from '@/lib/api/perfiles'
+import { declararHabilidad, listarMisHabilidades, mensajeDeErrorHabilidades } from '@/lib/api/habilidades'
 import { useAuthStore } from '@/store/auth.store'
 import { calculateReadinessScore } from '@/lib/utils'
 import type { Skill, SkillCategory, StudentProfile } from '@/types'
@@ -40,7 +41,6 @@ export default function HabilidadesPage() {
   const [selectedCategory, setSelectedCategory] = useState<SkillCategory>('TECNICA')
   const [selectedLevel, setSelectedLevel] = useState(1)
   const [saving, setSaving]             = useState(false)
-  const [deletingId, setDeletingId]     = useState<string | null>(null)
   const [error, setError]               = useState<string | null>(null)
 
   // Score calculado localmente para actualización inmediata
@@ -51,9 +51,12 @@ export default function HabilidadesPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return
-    api.get<StudentProfile>('/students/me')
-      .then(p => { setProfile(p); setSkills(p.skills ?? []) })
-      .catch(() => {})
+    Promise.all([obtenerPerfil(), listarMisHabilidades()])
+      .then(([perfil, habilidades]) => {
+        setProfile(aStudentProfile(perfil))
+        setSkills(habilidades)
+      })
+      .catch(err => setError(mensajeDeErrorHabilidades(err, 'No se pudieron cargar las habilidades.')))
   }, [isAuthenticated])
 
   const addSkill = async () => {
@@ -71,10 +74,10 @@ export default function HabilidadesPage() {
 
     try {
       if (isAuthenticated) {
-        const created = await api.post<Skill>('/skills', {
-          name,
-          category: selectedCategory,
-          level: selectedLevel,
+        const created = await declararHabilidad({
+          nombre: name,
+          categoria: selectedCategory,
+          nivel: selectedLevel,
         })
         setSkills(prev => [...prev, created])
       } else {
@@ -94,24 +97,9 @@ export default function HabilidadesPage() {
       setNewSkill('')
       setSelectedLevel(1)
     } catch (err: any) {
-      const msg = err?.response?.data?.message
-      setError(Array.isArray(msg) ? msg[0] : msg ?? 'Error al agregar la habilidad.')
+      setError(mensajeDeErrorHabilidades(err, 'Error al agregar la habilidad.'))
     } finally {
       setSaving(false)
-    }
-  }
-
-  const removeSkill = async (id: string) => {
-    setDeletingId(id)
-    try {
-      if (isAuthenticated) {
-        await api.delete(`/skills/${id}`)
-      }
-      setSkills(prev => prev.filter(s => s.id !== id))
-    } catch {
-      // silencioso
-    } finally {
-      setDeletingId(null)
     }
   }
 
@@ -272,16 +260,6 @@ export default function HabilidadesPage() {
                           : 'Sin validar'}
                     </span>
 
-                    {/* Eliminar */}
-                    <button
-                      onClick={() => removeSkill(skill.id)}
-                      disabled={deletingId === skill.id}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-outline hover:text-error transition-all disabled:opacity-40"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {deletingId === skill.id ? 'progress_activity' : 'delete'}
-                      </span>
-                    </button>
                   </div>
                 ))}
               </div>

@@ -1,0 +1,13 @@
+{
+  "tipo": "HabilidadValidada",
+  "version": 1,
+  "id": "4b1dc8d3-3d05-4e17-88fd-3780fbf84854",
+  "fecha": "2026-10-23T20:00:00.000Z",
+  "destinatarioId": "estudiante-001",
+  "datos": {
+    "estudianteId": "estudiante-001",
+    "habilidadId": "docker",
+    "nombre": "Docker",
+    "colegioId": "colegio-001"
+  }
+}

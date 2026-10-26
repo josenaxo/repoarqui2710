@@ -3,21 +3,21 @@
 import { useState, useEffect } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { SkillPill } from '@/components/ui/SkillPill'
-import { api } from '@/lib/api-client'
+import {
+  listarHabilidadesPendientes,
+  mensajeDeErrorHabilidades,
+  revisarHabilidad,
+  type HabilidadPendiente,
+} from '@/lib/api/habilidades'
 import { useAuthStore } from '@/store/auth.store'
-import type { Skill, StudentProfile } from '@/types'
+import type { StudentProfile } from '@/types'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 type ValidationAction = 'VALIDADA' | 'RECHAZADA' | null
 
-// Shape returned by GET /skills/pending-validations
-interface PendingSkill extends Skill {
-  student: StudentProfile & { user?: { email: string } }
-}
-
 // Group skills by student
-function groupByStudent(skills: PendingSkill[]): Map<string, { student: StudentProfile; skills: PendingSkill[] }> {
-  const map = new Map<string, { student: StudentProfile; skills: PendingSkill[] }>()
+function groupByStudent(skills: HabilidadPendiente[]): Map<string, { student: StudentProfile; skills: HabilidadPendiente[] }> {
+  const map = new Map<string, { student: StudentProfile; skills: HabilidadPendiente[] }>()
   for (const skill of skills) {
     const sid = skill.student.id
     if (!map.has(sid)) map.set(sid, { student: skill.student, skills: [] })
@@ -29,14 +29,15 @@ function groupByStudent(skills: PendingSkill[]): Map<string, { student: StudentP
 export default function ValidacionesPage() {
   usePageTitle('Validaciones y sugerencias')
   const { isAuthenticated } = useAuthStore()
-  const [pendingSkills, setPendingSkills] = useState<PendingSkill[]>([])
+  const [pendingSkills, setPendingSkills] = useState<HabilidadPendiente[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isAuthenticated) {
-      api.get<PendingSkill[]>('/skills/pending-validations')
+      listarHabilidadesPendientes()
         .then(data => setPendingSkills(data))
-        .catch(() => {})
+        .catch(err => setLoadError(mensajeDeErrorHabilidades(err, 'No se pudieron cargar las validaciones.')))
         .finally(() => setLoading(false))
     } else {
       setLoading(false)
@@ -88,6 +89,8 @@ export default function ValidacionesPage() {
         </div>
       </div>
 
+      {loadError && <p className="mb-4 text-sm text-error font-semibold">{loadError}</p>}
+
       <div className="space-y-6">
         {Array.from(grouped.values()).map(({ student, skills }) => (
           <StudentValidationCard
@@ -116,7 +119,7 @@ function StudentValidationCard({
   onSaved,
 }: {
   student: StudentProfile
-  pendingSkills: PendingSkill[]
+  pendingSkills: HabilidadPendiente[]
   onSaved: (ids: string[]) => void
 }) {
   const { isAuthenticated } = useAuthStore()
@@ -147,19 +150,16 @@ function StudentValidationCard({
       for (const [skillId, status] of toProcess) {
         if (!status) continue
         if (isAuthenticated) {
-          await api.post('/skills/validate', {
-            studentId: student.id,
-            skillId,
-            status,
-            notes: notes[skillId] || undefined,
+          await revisarHabilidad(student.id, skillId, {
+            estado: status === 'VALIDADA' ? 'validada' : 'rechazada',
+            comentario: notes[skillId] || undefined,
           })
         }
         savedIds.push(skillId)
       }
       onSaved(savedIds)
     } catch (err: any) {
-      const msg = err?.response?.data?.message
-      setError(Array.isArray(msg) ? msg[0] : msg ?? 'Error al guardar las validaciones.')
+      setError(mensajeDeErrorHabilidades(err, 'Error al guardar las validaciones.'))
     } finally {
       setSaving(false)
     }

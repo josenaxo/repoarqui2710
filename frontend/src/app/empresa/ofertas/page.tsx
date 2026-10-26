@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { api } from '@/lib/api-client'
+import { listarPostulantes, misOportunidades, publicarOportunidad } from '@/lib/api/postulaciones'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/Button'
 import { cn, timeAgo } from '@/lib/utils'
@@ -46,11 +46,12 @@ export default function GestionOfertasPage() {
       setLoading(true)
       try {
         if (isAuthenticated) {
-          const [offersData, applicants] = await Promise.all([
-            api.get<Opportunity[]>('/opportunities/my-offers'),
-            api.get<{ opportunityId: string }[]>('/applications/applicants').catch(() => []),
-          ])
-          const offers = Array.isArray(offersData) ? offersData : []
+          const offers = await misOportunidades()
+          // Postulantes de cada oferta, en paralelo (una llamada por oferta)
+          const listas = await Promise.all(
+            offers.map(o => listarPostulantes(o.id).catch(() => [])),
+          )
+          const applicants = listas.flat()
           // Recalculate applicantsCount from real applicant data
           const countByOpp: Record<string, number> = {}
           if (Array.isArray(applicants)) {
@@ -81,47 +82,36 @@ export default function GestionOfertasPage() {
     setSaving(true)
     setError(null)
 
+    // Solo los campos de NuevaOportunidad (contrato): el backend rechaza campos extra
     const payload = {
-      title:       form.title.trim(),
-      location:    form.location.trim(),
-      type:        form.type,
-      description: form.description.trim(),
-      skills:      form.skills.split(',').map(s => s.trim()).filter(Boolean),
-      salary:      form.salary.trim() || undefined,
-      isRemote:    form.isRemote,
-      deadline:    form.deadline || undefined,
+      titulo:      form.title.trim(),
+      descripcion: form.description.trim(),
+      tipo:        form.type,
+      ubicacion:   form.location.trim(),
+      remoto:      form.isRemote,
     }
 
     try {
       if (isAuthenticated) {
-        const created = await api.post<Opportunity>('/opportunities', payload)
+        const created = await publicarOportunidad(payload)
         setOffers(prev => [created, ...prev])
       }
       setForm(emptyForm)
       setShowForm(false)
     } catch (err: any) {
-      const msg = err?.response?.data?.message
-      setError(Array.isArray(msg) ? msg[0] : msg ?? 'Error al publicar la oferta.')
+      setError(err?.response?.data?.mensaje ?? 'Error al publicar la oferta.')
     } finally {
       setSaving(false)
     }
   }
 
-  const toggleActive = async (id: string) => {
-    const offer = offers.find(o => o.id === id)
-    if (!offer) return
-    const newActive = !offer.isActive
-    setOffers(prev => prev.map(o => o.id === id ? { ...o, isActive: newActive } : o))
-    if (isAuthenticated) {
-      await api.patch(`/opportunities/${id}`, { isActive: newActive }).catch(() => {})
-    }
+  // Pausar y borrar ofertas: fase 2 (no están en contracts/api/postulaciones.yaml)
+  const toggleActive = async (_id: string) => {
+    alert('Pausar ofertas estará disponible pronto.')
   }
 
-  const handleDelete = async (id: string) => {
-    setOffers(prev => prev.filter(o => o.id !== id))
-    if (isAuthenticated) {
-      await api.delete(`/opportunities/${id}`).catch(() => {})
-    }
+  const handleDelete = async (_id: string) => {
+    alert('Eliminar ofertas estará disponible pronto.')
   }
 
   return (

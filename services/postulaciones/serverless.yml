@@ -1,0 +1,57 @@
+# Servicio postulaciones (B2-04): ofertas de empresas y postulaciones de estudiantes.
+# Usa el HTTP API, el autorizador, la tabla y la cola de infra/shared: primero desplegar infra/shared en el mismo stage.
+# Contrato: contracts/api/postulaciones.yaml · Modelo de datos: docs/datos/postulaciones.md
+service: ceibbo-postulaciones
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 10
+  iam:
+    role: arn:aws:iam::${aws:accountId}:role/LabRole
+  httpApi:
+    id: ${cf:ceibbo-shared-${sls:stage}.HttpApiId}
+  environment:
+    TABLE_NAME: ${cf:ceibbo-shared-${sls:stage}.TableName}
+    EVENTS_QUEUE_URL: ${cf:ceibbo-shared-${sls:stage}.EventsQueueUrl}
+
+package:
+  patterns:
+    - '!test/**'
+    - '!**/*.md'
+
+functions:
+  postulaciones:
+    handler: src/adapters/in/http.handler
+    events:
+      # Todas las rutas pasan por el autorizador JWT (&autorizador se reutiliza con *autorizador)
+      - httpApi:
+          method: POST
+          path: /oportunidades
+          authorizer: &autorizador
+            type: jwt
+            id: ${cf:ceibbo-shared-${sls:stage}.AuthorizerId}
+      - httpApi:
+          method: GET
+          path: /oportunidades
+          authorizer: *autorizador
+      - httpApi:
+          method: GET
+          path: /oportunidades/mias
+          authorizer: *autorizador
+      - httpApi:
+          method: POST
+          path: /oportunidades/{id}/postulaciones
+          authorizer: *autorizador
+      - httpApi:
+          method: GET
+          path: /oportunidades/{id}/postulaciones
+          authorizer: *autorizador
+      - httpApi:
+          method: GET
+          path: /postulaciones/mias
+          authorizer: *autorizador

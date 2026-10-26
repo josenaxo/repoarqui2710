@@ -1,0 +1,155 @@
+openapi: 3.0.3
+info:
+  title: Ceibbo - Servicio habilidades
+  version: 1.0.0
+servers:
+  - url: https://{apiId}.execute-api.us-east-1.amazonaws.com
+    variables:
+      apiId:
+        default: example
+security:
+  - cognito: []
+paths:
+  /habilidades:
+    post:
+      summary: Declarar una habilidad propia
+      x-grupos: [estudiante]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaHabilidad'
+      responses:
+        '201':
+          description: Habilidad declarada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Habilidad' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /habilidades/me:
+    get:
+      summary: Listar las habilidades del estudiante autenticado
+      x-grupos: [estudiante]
+      responses:
+        '200':
+          description: Lista de habilidades
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Habilidad' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /habilidades/pendientes:
+    get:
+      summary: Listar las habilidades pendientes del colegio autenticado
+      x-grupos: [colegio]
+      responses:
+        '200':
+          description: Habilidades de estudiantes del mismo colegio
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Habilidad' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /habilidades/{estudianteId}/{habilidadId}:
+    parameters:
+      - name: estudianteId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: habilidadId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      summary: Validar o rechazar una habilidad
+      x-grupos: [colegio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              additionalProperties: false
+              properties:
+                estado: { type: string, enum: [validada, rechazada] }
+                comentario: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Habilidad revisada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Habilidad' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '500': { $ref: '#/components/responses/Error500' }
+components:
+  securitySchemes:
+    cognito:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    NuevaHabilidad:
+      type: object
+      required: [nombre]
+      additionalProperties: false
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 100, example: Docker }
+        categoria: { type: string, enum: [TECNICA, BLANDA, CERTIFICACION], default: TECNICA }
+        nivel: { type: integer, minimum: 1, maximum: 5, default: 1 }
+    Habilidad:
+      type: object
+      required: [id, nombre, estudianteId, colegioId, estado, creadaEn]
+      properties:
+        id: { type: string, example: docker }
+        nombre: { type: string, example: Docker }
+        categoria: { type: string, enum: [TECNICA, BLANDA, CERTIFICACION] }
+        nivel: { type: integer, minimum: 1, maximum: 5 }
+        estudianteId: { type: string }
+        colegioId: { type: string, example: school-1 }
+        estado: { type: string, enum: [declarada, validada, rechazada] }
+        creadaEn: { type: string, format: date-time }
+        revisadaEn: { type: string, format: date-time }
+        comentario: { type: string }
+    Error:
+      type: object
+      required: [mensaje]
+      properties:
+        mensaje: { type: string }
+  responses:
+    Error400:
+      description: Solicitud invalida
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error401:
+      description: Token ausente o invalido
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error403:
+      description: El grupo o colegio no esta autorizado
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error404:
+      description: Perfil o habilidad no encontrado
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error409:
+      description: Habilidad duplicada o ya revisada
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error500:
+      description: Error interno sin detalles sensibles
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

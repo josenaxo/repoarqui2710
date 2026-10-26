@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { applicationStatusLabel, timeAgo } from '@/lib/utils'
-import { api } from '@/lib/api-client'
+import { misPostulaciones } from '@/lib/api/postulaciones'
 import { useAuthStore } from '@/store/auth.store'
 import type { Application } from '@/types'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -22,7 +22,7 @@ function PostulacionesContent() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      api.get<Application[]>('/applications/mine')
+      misPostulaciones()
         .then(data => setApplications(data))
         .catch(() => {})
         .finally(() => setLoading(false))
@@ -35,10 +35,8 @@ function PostulacionesContent() {
     if (!confirm('¿Retirás tu postulación?')) return
     setWithdrawingId(id)
     try {
-      if (isAuthenticated) {
-        await api.delete(`/applications/${id}`)
-      }
-      setApplications(prev => prev.filter(a => a.id !== id))
+      // Retirar postulación: fase 2 (no está en contracts/api/postulaciones.yaml)
+      alert('Retirar postulaciones estará disponible pronto.')
     } catch {
       // silencioso
     } finally {

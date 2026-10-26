@@ -1,0 +1,40 @@
+service: ceibbo-habilidades
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+  httpApi:
+    id: ${cf:ceibbo-shared-${sls:stage}.HttpApiId}
+  environment:
+    TABLE_NAME: ${cf:ceibbo-shared-${sls:stage}.TableName}
+    EVENTS_QUEUE_URL: ${cf:ceibbo-shared-${sls:stage}.EventsQueueUrl}
+    API_BASE_URL: ${cf:ceibbo-shared-${sls:stage}.HttpApiUrl}
+
+functions:
+  habilidades:
+    handler: src/adapters/in/http.handler
+    timeout: 15
+    events:
+      - httpApi:
+          method: POST
+          path: /habilidades
+          authorizer: &cognito
+            type: jwt
+            id: ${cf:ceibbo-shared-${sls:stage}.AuthorizerId}
+      - httpApi:
+          method: GET
+          path: /habilidades/me
+          authorizer: *cognito
+      - httpApi:
+          method: GET
+          path: /habilidades/pendientes
+          authorizer: *cognito
+      - httpApi:
+          method: PATCH
+          path: /habilidades/{estudianteId}/{habilidadId}
+          authorizer: *cognito

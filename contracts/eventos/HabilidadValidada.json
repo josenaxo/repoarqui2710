@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ceibbo.cl/contracts/eventos/HabilidadValidada.v1.json",
+  "title": "HabilidadValidada",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tipo", "version", "id", "fecha", "destinatarioId", "datos"],
+  "properties": {
+    "tipo": { "const": "HabilidadValidada" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "format": "uuid" },
+    "fecha": { "type": "string", "format": "date-time" },
+    "destinatarioId": { "type": "string", "minLength": 1 },
+    "datos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estudianteId", "habilidadId", "nombre", "colegioId"],
+      "properties": {
+        "estudianteId": { "type": "string" },
+        "habilidadId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "colegioId": { "type": "string" }
+      }
+    }
+  }
+}

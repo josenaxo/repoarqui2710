@@ -23,9 +23,14 @@ function leerBody(event) {
   }
 }
 
+// X-App-Version: qué versión de la Lambda respondió ("$LATEST" si se llamó directo,
+// "3", "4"... si se llamó por el alias). Con ella el canario mide cada versión por separado (F2-12).
 const respuesta = (statusCode, body) => ({
   statusCode,
-  headers: { 'content-type': 'application/json' },
+  headers: {
+    'content-type': 'application/json',
+    'x-app-version': process.env.AWS_LAMBDA_FUNCTION_VERSION ?? 'local',
+  },
   body: JSON.stringify(body),
 })
 

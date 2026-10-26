@@ -40,3 +40,28 @@ Formato de cada entrada: contexto · decisión · alternativas · consecuencias 
 - Se pierde la verificación de tipos; se compensa con pruebas unitarias del caso de uso y validación de datos en el dominio.
 
 **Fuentes.** Documentación de Node.js 22: `node:test` y módulos ECMAScript.
+
+
+## D-03 · Canario sobre GET /oportunidades, con la ruta fuera de serverless.yml
+
+**Fecha:** 26 de octubre de 2026 · **Responsables:** Rol 1 (servicio) y Rol 2 (canario, F2-12)
+
+**Contexto.** La evaluación 2 pide mostrar la implementación canaria funcionando a través de la API. Los scripts `scripts/canario/*.ps1` mueven el peso de un alias, pero las rutas que crea Serverless apuntan a `$LATEST`, así que el canario no se ve por curl o Postman. El laboratorio del ramo indica que API Gateway debe apuntar al alias. El plan (F2-12) sugería la función postular.
+
+**Decisión.**
+- El canario se aplica a la función `postulaciones`, en la ruta `GET /oportunidades`.
+- Esa ruta se saca de `serverless.yml` y la crea `scripts/canario/canario-servicio.sh` apuntando al alias `live`, con el autorizador JWT.
+- Todas las respuestas del servicio llevan la cabecera `X-App-Version` con `AWS_LAMBDA_FUNCTION_VERSION`.
+
+**Alternativas.**
+- `POST /oportunidades/{id}/postulaciones`, como sugería el plan: un estudiante postula una sola vez, así que una prueba de carga repetida da 409 y además publica eventos reales en SQS.
+- `GET /health`: no necesita token, pero no es una ruta de negocio.
+- Dejar la ruta en `serverless.yml` y moverla a mano después de cada deploy: un deploy la devolvería a `$LATEST` sin avisar.
+
+**Consecuencias.**
+- Es una ruta de solo lectura y crítica para el estudiante, que se puede probar muchas veces sin efectos secundarios.
+- `serverless deploy` ya no administra esa ruta: si el stack se borra, hay que volver a crearla con el script.
+- La carga de prueba necesita enviar un token (cambio pequeño en `generar_carga.js`).
+- Las otras 5 rutas siguen con despliegue estándar y responden `X-App-Version: $LATEST`.
+
+**Fuentes.** Guía del laboratorio "Despliegue canario" del ramo, sección 2.3. AWS: *Implement Lambda canary deployments using a weighted alias*.

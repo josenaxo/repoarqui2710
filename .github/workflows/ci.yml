@@ -1,0 +1,82 @@
+# CI de Ceibbo (F2-23, anexo A.4 del plan): en cada push revisa el frontend y prueba cada servicio.
+# Los servicios corren sus pruebas de integracion contra DynamoDB Local, el mismo contenedor de B1-04.
+# No despliega: las credenciales del Learner Lab duran unas 4 horas y no se pueden dejar como secretos
+# en GitHub, asi que el despliegue (y el canario) sigue siendo manual con serverless y scripts/canario.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# el token de GitHub solo puede leer el repo (minimo privilegio); el CI no escribe nada
+permissions:
+  contents: read
+
+# si se hacen varios push seguidos a la misma rama, se cancela la corrida vieja y no se gastan minutos
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint y tipos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+
+  servicios:
+    name: Servicio ${{ matrix.servicio }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # si falla un servicio igual se ven los resultados de los otros
+      fail-fast: false
+      matrix:
+        # cada servicio nuevo (por ejemplo notificaciones) se agrega a esta lista
+        servicio: [health, perfiles, habilidades, postulaciones]
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:2.5.2
+        ports:
+          - 8000:8000
+    env:
+      DYNAMO_ENDPOINT: http://localhost:8000
+      TABLE_NAME: ceibbo-app-local
+      AWS_REGION: us-east-1
+      # dynamo local no revisa credenciales, estas son de mentira y no sirven en AWS
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            services/${{ matrix.servicio }}/package-lock.json
+      - name: Dependencias de scripts/local (crear-tabla y seed)
+        run: npm ci
+      - name: Dependencias del servicio
+        working-directory: services/${{ matrix.servicio }}
+        run: npm ci
+      - name: Sintaxis de todos los archivos
+        run: node scripts/check-service.mjs services/${{ matrix.servicio }}
+      - name: Pruebas unitarias
+        working-directory: services/${{ matrix.servicio }}
+        run: npm test
+      - name: Pruebas de integracion contra DynamoDB Local
+        working-directory: services/${{ matrix.servicio }}
+        run: npm run test:integracion --if-present

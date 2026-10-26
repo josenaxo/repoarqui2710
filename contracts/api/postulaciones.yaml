@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  title: Ceibbo - Servicio postulaciones
+  version: 1.0.0
+  description: Ofertas de empresas y postulaciones de estudiantes (CU-04 a CU-07, nucleo). Modelo de datos en docs/datos/postulaciones.md.
+servers:
+  - url: https://{apiId}.execute-api.us-east-1.amazonaws.com
+    variables:
+      apiId:
+        default: example
+security:
+  - cognito: []
+paths:
+  /oportunidades:
+    post:
+      summary: Publicar una oferta
+      x-grupos: [empresa]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NuevaOportunidad' }
+      responses:
+        '201':
+          description: Oferta publicada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Oportunidad' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '500': { $ref: '#/components/responses/Error500' }
+    get:
+      summary: Listar las ofertas activas, mas nuevas primero
+      x-grupos: [estudiante, empresa, colegio]
+      responses:
+        '200':
+          description: Lista de ofertas activas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Oportunidad' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /oportunidades/mias:
+    get:
+      summary: Listar las ofertas de la empresa autenticada
+      x-grupos: [empresa]
+      responses:
+        '200':
+          description: Ofertas publicadas por la empresa
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Oportunidad' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /oportunidades/{id}/postulaciones:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Postular a una oferta (idempotente)
+      description: Un estudiante tiene como maximo una postulacion por oferta. El segundo intento responde 409 y no duplica nada.
+      x-grupos: [estudiante]
+      responses:
+        '201':
+          description: Postulacion creada; se publica el evento PostulacionCreada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Postulacion' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '500': { $ref: '#/components/responses/Error500' }
+    get:
+      summary: Listar los postulantes de una oferta propia
+      x-grupos: [empresa]
+      responses:
+        '200':
+          description: Postulaciones de la oferta
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Postulacion' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /postulaciones/mias:
+    get:
+      summary: Listar las postulaciones del estudiante autenticado
+      x-grupos: [estudiante]
+      responses:
+        '200':
+          description: Postulaciones del estudiante, mas nuevas primero
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Postulacion' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '500': { $ref: '#/components/responses/Error500' }
+components:
+  securitySchemes:
+    cognito:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    NuevaOportunidad:
+      type: object
+      required: [titulo, descripcion, tipo]
+      additionalProperties: false
+      properties:
+        titulo: { type: string, minLength: 1, maxLength: 120, example: Practica Desarrollador Junior }
+        descripcion: { type: string, minLength: 1, maxLength: 2000 }
+        tipo: { type: string, enum: [PASANTIA, PRACTICA, TRABAJO, PROYECTO] }
+        ubicacion: { type: string, maxLength: 120, example: Santiago }
+        remoto: { type: boolean, default: false }
+        especialidad: { type: string, maxLength: 80, example: Programacion }
+    Oportunidad:
+      type: object
+      required: [id, empresaId, titulo, descripcion, tipo, activa, creadaEn]
+      properties:
+        id: { type: string, format: uuid }
+        empresaId: { type: string, description: sub de Cognito de la empresa }
+        titulo: { type: string }
+        descripcion: { type: string }
+        tipo: { type: string, enum: [PASANTIA, PRACTICA, TRABAJO, PROYECTO] }
+        ubicacion: { type: string }
+        remoto: { type: boolean }
+        especialidad: { type: string }
+        activa: { type: boolean }
+        creadaEn: { type: string, format: date-time }
+    Postulacion:
+      type: object
+      required: [oportunidadId, estudianteId, empresaId, titulo, estado, creadaEn]
+      properties:
+        oportunidadId: { type: string, format: uuid }
+        estudianteId: { type: string, description: sub de Cognito del estudiante }
+        empresaId: { type: string }
+        titulo: { type: string, description: copiado de la oferta }
+        estado: { type: string, enum: [enviada] }
+        creadaEn: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [mensaje]
+      properties:
+        mensaje: { type: string }
+  responses:
+    Error400:
+      description: Datos invalidos
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error401:
+      description: Token ausente o invalido (lo responde el autorizador)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error403:
+      description: El grupo no esta autorizado o la oferta es de otra empresa
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error404:
+      description: La oferta no existe
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error409:
+      description: Ya postulaste a esta oferta, o la oferta esta cerrada
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Error500:
+      description: Error interno sin detalles sensibles
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

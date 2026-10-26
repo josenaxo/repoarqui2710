@@ -48,3 +48,13 @@ test('500 sin detalles si algo falla por dentro', async () => {
     console.error = original
   }
 })
+
+test('toda respuesta trae X-App-Version con la versión de la Lambda, también los errores', async () => {
+  process.env.AWS_LAMBDA_FUNCTION_VERSION = '7'
+  const manejar = crearHandler(dependencias())
+  const ok = await manejar(evento('GET /oportunidades', { sub: 'est', grupos: '[estudiante]' }))
+  const error = await manejar(evento('POST /oportunidades', { sub: 'emp', grupos: '[empresa]', body: '{malo' }))
+  delete process.env.AWS_LAMBDA_FUNCTION_VERSION
+  assert.equal(ok.headers['x-app-version'], '7')
+  assert.equal(error.headers['x-app-version'], '7')
+})

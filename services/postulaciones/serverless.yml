@@ -35,10 +35,9 @@ functions:
           authorizer: &autorizador
             type: jwt
             id: ${cf:ceibbo-shared-${sls:stage}.AuthorizerId}
-      - httpApi:
-          method: GET
-          path: /oportunidades
-          authorizer: *autorizador
+      # GET /oportunidades NO va aquí: la crea scripts/canario/canario-servicio.sh apuntando
+      # al alias "live" de esta función, para el despliegue canario (F2-12, docs/decisiones.md D-03).
+      # Si estuviera aquí, cada serverless deploy la volvería a apuntar a $LATEST.
       - httpApi:
           method: GET
           path: /oportunidades/mias

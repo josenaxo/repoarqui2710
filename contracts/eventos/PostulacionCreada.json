@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ceibbo.cl/contracts/eventos/PostulacionCreada.v1.json",
+  "title": "PostulacionCreada",
+  "description": "Lo publica el servicio postulaciones en la cola de eventos cuando un estudiante postula a una oferta. Lo consume notificaciones (fase 2) para avisar a la empresa.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tipo", "version", "id", "fecha", "destinatarioId", "datos"],
+  "properties": {
+    "tipo": { "const": "PostulacionCreada" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "format": "uuid" },
+    "fecha": { "type": "string", "format": "date-time" },
+    "destinatarioId": { "type": "string", "minLength": 1 },
+    "datos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oportunidadId", "estudianteId", "empresaId", "titulo"],
+      "properties": {
+        "oportunidadId": { "type": "string", "format": "uuid" },
+        "estudianteId": { "type": "string" },
+        "empresaId": { "type": "string" },
+        "titulo": { "type": "string" }
+      }
+    }
+  }
+}

@@ -4,8 +4,9 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { OpportunityCard } from '@/components/shared/OpportunityCard'
 import { api } from '@/lib/api-client'
+import { listarOportunidades, misPostulaciones, postular } from '@/lib/api/postulaciones'
 import { useAuthStore } from '@/store/auth.store'
-import type { Application, Opportunity, OpportunityType } from '@/types'
+import type { Opportunity, OpportunityType } from '@/types'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const typeFilters: { label: string; value: OpportunityType | 'ALL' }[] = [
@@ -48,15 +49,12 @@ function OportunidadesContent() {
       setLoading(true)
       try {
         if (isAuthenticated) {
-          // Fetch opportunities, applied IDs and saved IDs in parallel
-          const [oppsRes, apps, savedRes] = await Promise.all([
-            api.get<{ data: Opportunity[] } | Opportunity[]>('/opportunities/for-me'),
-            api.get<Application[]>('/applications/mine').catch(() => [] as Application[]),
-            api.get<{ data: Opportunity[] }>('/opportunities/saved/mine').catch(() => ({ data: [] })),
+          // Ofertas activas y mis postulaciones, en paralelo (contrato postulaciones.yaml)
+          const [oppsArr, apps] = await Promise.all([
+            listarOportunidades(),
+            misPostulaciones().catch(() => []),
           ])
-          const oppsArr: Opportunity[] = Array.isArray(oppsRes)
-            ? oppsRes
-            : (oppsRes as any).data ?? []
+          const savedRes = { data: [] as Opportunity[] } // guardar ofertas: fase 2
           const alreadyApplied = new Set(apps.map(a => a.opportunityId))
           const alreadySaved   = new Set((savedRes?.data ?? []).map((o: Opportunity) => o.id))
           setAppliedIds(alreadyApplied)
@@ -91,21 +89,19 @@ function OportunidadesContent() {
     setAppliedIds(prev => new Set(Array.from(prev).concat(id)))
     setOpportunities(prev => prev.filter(o => o.id !== id))
     try {
-      await api.post('/applications', { opportunityId: id })
-    } catch {
-      // Revert both on failure
+      await postular(id)
+    } catch (e: any) {
+      // 409 = ya habias postulado: el backend no duplica nada, la dejamos marcada
+      if (e?.response?.status === 409) return
+      // Otro error: deshacer y volver a mostrar la oferta
       setAppliedIds(prev => { const n = new Set(prev); n.delete(id); return n })
-      // Re-fetch to restore the opportunity in the list
-      api.get<{ data: Opportunity[] } | Opportunity[]>('/opportunities/for-me')
-        .then(res => {
-          const arr: Opportunity[] = Array.isArray(res) ? res : (res as any).data ?? []
-          setOpportunities(prev => {
-            const ids = new Set(prev.map(o => o.id))
-            const restored = arr.find(o => o.id === id)
-            return restored ? [restored, ...prev] : prev
-          })
+      listarOportunidades()
+        .then(arr => {
+          const restored = arr.find(o => o.id === id)
+          if (restored) setOpportunities(prev => [restored, ...prev])
         })
         .catch(() => {})
+      setError('No se pudo enviar la postulación. Intenta de nuevo.')
     }
   }
 
